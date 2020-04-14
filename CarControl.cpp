@@ -14,6 +14,7 @@ CarControl::CarControl() {
 
 	if (reset())
 	{
+		ultrasonicSensor.set_mode(ultrasonicSensor.mode_us_dist_cm);
 		calibSteering();
 	}
 }
@@ -141,6 +142,11 @@ bool CarControl::isBumperPressed()
 	return bumperSensor.is_pressed();
 }
 
+float CarControl::getUltrasonicDistance()
+{
+	return ultrasonicSensor.distance_centimeters(false);
+}
+
 bool CarControl::isDriveOverloaded()
 {
 	return driveMotor.state().count("stalled") || driveMotor.state().count("overloaded");
@@ -175,8 +181,10 @@ bool CarControl::reset()
 	else
 		success = false;
 
-	if (!bumperSensor.connected())
-		success = false;
+	success &= bumperSensor.connected();
+
+	success &= ultrasonicSensor.connected();
+
 	return success;
 }
 

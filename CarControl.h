@@ -118,12 +118,18 @@ public:
 	 * @return current state of steering motor
 	 */
 	steerState getSteeringState();
+
+	/*
+	 * @return distance from (front) ultrasonic sensor
+	 */
+	float getUltrasonicDistance();
 private:
 	CarControl();
 	virtual ~CarControl();
 	ev3dev::large_motor driveMotor;
 	ev3dev::medium_motor steeringMotor;
 	ev3dev::touch_sensor bumperSensor;	// Switch to detect collisions
+	ev3dev::ultrasonic_sensor ultrasonicSensor;
 	int steeringRange;					// Positive or negative range from neutral position
 };
 
