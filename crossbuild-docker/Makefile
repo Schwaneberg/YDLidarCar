@@ -1,9 +1,9 @@
-C = /usr/bin/arm-linux-gnueabi-gcc-4.9
-CPP = /usr/bin/arm-linux-gnueabi-g++-4.9
-LD = /usr/bin/arm-linux-gnueabi-g++-4.9
+C = /usr/bin/arm-linux-gnueabi-gcc
+CPP = /usr/bin/arm-linux-gnueabi-g++
+LD = /usr/bin/arm-linux-gnueabi-g++
 CCFLAGS=-std=c++11 -Wall -O2 -I./ev3dev-lang-cpp -rdynamic
 OBJ=
-LIBS=-lstdc++ -lc -L/usr/lib/gcc/arm-linux-gnueabi/4.9 -L/lib/arm-linux-gnueabi -L/usr/lib/arm-linux-gnueabi -L./ev3dev-lang-cpp/build/ -lev3dev -lpthread -lm -rdynamic
+LIBS=-lstdc++ -lc -L/usr/lib/gcc/arm-linux-gnueabi/6 -L/lib/arm-linux-gnueabi -L/usr/lib/arm-linux-gnueabi -L./ev3dev-lang-cpp/build/ -lev3dev -lpthread -lm -rdynamic
  
 # File names
 SOURCES = $(wildcard *.cpp)

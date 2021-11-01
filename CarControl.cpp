@@ -9,7 +9,10 @@
 
 namespace car {
 
-CarControl::CarControl() {
+CarControl::CarControl() :
+	forkMotor(ev3dev::OUTPUT_B),
+	driveMotor(ev3dev::OUTPUT_D)
+{
 	steeringRange = 0;
 
 	if (reset())
@@ -136,11 +139,6 @@ void CarControl::setDriveSpeed(int percent)
 	}
 }
 
-bool CarControl::isBumperPressed()
-{
-	return bumperSensor.is_pressed();
-}
-
 bool CarControl::isDriveOverloaded()
 {
 	return driveMotor.state().count("stalled") || driveMotor.state().count("overloaded");
@@ -168,15 +166,19 @@ bool CarControl::reset()
 	if (driveMotor.connected())
 		driveMotor.reset();
 	else
+	{
+		std::cerr << "Drive motor not connected!" << std::endl;
 		success = false;
+	}
 
 	if (steeringMotor.connected())
 		steeringMotor.reset();
 	else
+	{
+		std::cerr << "Steering motor not connected!" << std::endl;
 		success = false;
+	}
 
-	if (!bumperSensor.connected())
-		success = false;
 	return success;
 }
 

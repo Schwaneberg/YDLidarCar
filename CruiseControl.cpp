@@ -48,7 +48,6 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 	float minDistFront = 10.0, minDistBack = 10.0;
 	float angleToMinDistFrontDeg = 0.0, angleToMinDistFront = 0.0;
 	static float x, y;
-	auto isBumperPressed = car.isBumperPressed();
 	auto isDriveOverloaded = car.isDriveOverloaded();
 	auto now = std::chrono::high_resolution_clock::now();
 	/*static auto prev_time = now;
@@ -56,7 +55,6 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 	std::cout << "Rate: " << 1.0f / pausetime.count() << std::endl;
 	prev_time = now;*/
 	std::chrono::duration<double> elapsed = now - collisionTime;
-	bool bumperTimeLock = elapsed.count() < 5.0;
 	elapsed = now - reversionTime;
 	bool reversionTimeLock = elapsed.count() < 3.5;
 #if RECORD_RAW
@@ -65,18 +63,8 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 	fs.open ("data.csv", std::fstream::in | std::fstream::out | std::fstream::app);
 	fs << "NEW DATA " << count++ << endl;
 #endif
-	if (isBumperPressed) {
-		auto curSteerDeg = car.getSteerDegree();
-		if (curSteerDeg > 10 || curSteerDeg < -10) {
-			car.steerToAbsDegree(curSteerDeg * -1);
-		} else {
-			car.steerHardLeft();
-		}
-		car.setDriveSpeed(REVERSE_SPEED);
-		newState = REVERSING;
-		collisionTime = std::chrono::high_resolution_clock::now();
-	} else if (isDriveOverloaded) {
-		if (prevState == REVERSING && !bumperTimeLock) {
+	if (isDriveOverloaded) {
+		if (prevState == REVERSING) {
 			newState = STEERING;
 			car.steerStraight();
 			car.setDriveSpeed(STEER_SPEED);
@@ -91,7 +79,7 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 			}
 			car.setDriveSpeed(REVERSE_SPEED);
 		}
-	} else if (!bumperTimeLock && !reversionTimeLock) {
+	} else if (!reversionTimeLock) {
 		for (auto tuple : scanData) {
 
 			// current angle
@@ -176,7 +164,6 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 			}
 		} else if (newState == REVERSING) {
 			if (minDistFront > 0.33
-					&& !bumperTimeLock
 					&& minDistBack > 0.25) {
 				car.setDriveSpeed(CRUISE_SPEED);
 				car.steerToPos(car.getSteerPos() * -1);

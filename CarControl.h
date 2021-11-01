@@ -104,11 +104,7 @@ public:
 	 */
 	void setDriveSpeed(int percent);
 
-	/*
-	 * @return true if the bumper switch is pressed
-	 */
-	bool isBumperPressed();
-
+	
 	/*
 	 * @return true if drive is stalled
 	 */
@@ -121,9 +117,9 @@ public:
 private:
 	CarControl();
 	virtual ~CarControl();
+	ev3dev::large_motor forkMotor;
 	ev3dev::large_motor driveMotor;
 	ev3dev::medium_motor steeringMotor;
-	ev3dev::touch_sensor bumperSensor;	// Switch to detect collisions
 	int steeringRange;					// Positive or negative range from neutral position
 };
 
