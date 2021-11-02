@@ -60,6 +60,16 @@ public:
 	void calibSteering();
 
 	/*
+	 * Control fork position
+	 */
+	void openFork();
+
+	/*
+	 * Control fork position: grasping
+	 */
+	void closeFork();
+
+	/*
 	 * Steer to absoulte motor position
 	 * @param absolute position
 	 */

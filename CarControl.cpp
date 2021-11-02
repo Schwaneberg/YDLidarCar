@@ -68,6 +68,26 @@ void CarControl::calibSteering()
 	std::cout << "range:" << steeringRange << std::endl;
 }
 
+void CarControl::openFork()
+{
+	/*
+	 * Check maximum angles, calibrate to middle
+	 */
+	forkMotor.set_stop_action("hold");
+	forkMotor.set_polarity("inversed").set_speed_sp(STEER_MOTOR_SPEED).run_forever();
+	while (forkMotor.state().count("stalled") == 0 && forkMotor.state().count("overloaded") == 0);
+	forkMotor.stop();
+	forkMotor.set_position(0);
+}
+
+void CarControl::closeFork()
+{
+	forkMotor.set_stop_action("hold");
+	forkMotor.set_polarity("normal").set_speed_sp(STEER_MOTOR_SPEED).run_forever();
+	while (forkMotor.state().count("stalled") == 0 && forkMotor.state().count("overloaded") == 0);
+	forkMotor.stop();
+}
+
 void CarControl::steerToPos(int pos)
 {
 	int curPos = steeringMotor.position();
@@ -176,6 +196,17 @@ bool CarControl::reset()
 	else
 	{
 		std::cerr << "Steering motor not connected!" << std::endl;
+		success = false;
+	}
+
+	if (forkMotor.connected())
+	{
+		forkMotor.reset();
+		openFork();
+	}
+	else
+	{
+		std::cerr << "Fork motor not connected!" << std::endl;
 		success = false;
 	}
 
