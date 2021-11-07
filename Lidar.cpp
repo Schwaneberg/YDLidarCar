@@ -10,6 +10,9 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <fstream>
+
+#define LOGGING false
 
 namespace lidar {
 
@@ -76,12 +79,28 @@ std::vector<std::tuple<float, float>> Lidar::scan() {
 	auto op_result = cylidar.lidarPtr->ascendScanData(nodes, count);
 
 	if (IS_OK(op_result)) {
+#if LOGGING
+		static auto scan_count = 0;
+		ofstream logfile;
+		logfile.open("points.json", ofstream::app | ofstream::out);
+		logfile << ++scan_count << ": {";
+#endif
 		for (unsigned int i = 0; i < count; i++) {
 			if (nodes[i].distance_q2 != 0) {
 				float angle = (float)((nodes[i].angle_q6_checkbit >> LIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f);
 				scanData.push_back(std::make_tuple(angle, nodes[i].distance_q2 / 4000.0f));
+#if LOGGING
+				if (scanData.size() > 1) {
+					logfile << ", ";
+				}
+				logfile << angle << ": " << nodes[i].distance_q2 / 4000.0f;
+#endif
 			}
 		}
+#if LOGGING
+		logfile << "}" << endl;
+		logfile.close();
+#endif
 	}
 	return scanData;
 }

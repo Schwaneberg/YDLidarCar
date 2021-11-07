@@ -25,6 +25,26 @@ CarControl::~CarControl() {
 	// TODO Auto-generated destructor stub
 }
 
+bool CarControl::openFork()
+{
+	forkMotor.set_stop_action("coast");
+	forkMotor.set_polarity("inversed").set_speed_sp(FORK_MOTOR_SPEED).set_position_sp(-80).run_to_abs_pos();
+	//while (forkMotor.state().count("stalled") == 0 && forkMotor.state().count("overloaded") == 0);
+	//forkMotor.stop();
+	std::cout << "FMP " << forkMotor.position() << std::endl;
+	return true;
+}
+
+bool CarControl::closeFork()
+{
+	forkMotor.set_stop_action("hold");
+	forkMotor.set_position(0);
+	forkMotor.set_polarity("normal").set_speed_sp(FORK_MOTOR_SPEED).run_forever();
+	while (forkMotor.state().count("stalled") == 0 && forkMotor.state().count("overloaded") == 0);
+	forkMotor.stop();
+	return true;
+}
+
 void CarControl::calibSteering()
 {
 	/*
@@ -176,6 +196,17 @@ bool CarControl::reset()
 	else
 	{
 		std::cerr << "Steering motor not connected!" << std::endl;
+		success = false;
+	}
+
+	if (forkMotor.connected())
+	{
+		forkMotor.reset();
+		closeFork();
+		openFork();
+	} else
+	{
+		std::cerr << "Fork motor not connected!" << std::endl;
 		success = false;
 	}
 

@@ -8,6 +8,8 @@
 #include "CruiseControl.h"
 #include <math.h>
 #include <fstream>
+#include <sstream>
+#include <iomanip>
 using namespace std;
 using namespace lidar;
 using namespace car;
@@ -42,7 +44,11 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 {
 	static auto collisionTime = std::chrono::high_resolution_clock::now() - std::chrono::seconds(5);
 	static auto reversionTime = std::chrono::high_resolution_clock::now() - std::chrono::seconds(5);
-	static carState newState = CRUISE, prevState = IDLE;
+	static carState newState = IDLE, prevState = IDLE;
+	static ObjectOfInterest ooi;
+	ObjectOfInterest new_ooi;
+	static float last_mid_ooi_angle = -1.0;
+	static float last_mid_ooi_distance = -100.0;
 	auto &car = CarControl::getInstance();
 	float steerTo = 0; //Straight
 	float minDistFront = 10.0, minDistBack = 10.0;
@@ -90,9 +96,49 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 			//current intensity
 			//int intensity = scan.intensities[i];
 			convertToXY(distance, angle, &x, &y);
+#if RECORD_RAW
+				fs << "F\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
+#endif
 
 
-			if (angleDeg < 60 || angleDeg > 300) {
+			if (distance <= 1.0 && distance < new_ooi.start_distance - 0.06)
+			{
+				// cout << "START " << angle << std::endl;
+				// Merke neuen Startpunkt
+				new_ooi.start_distance = distance;
+				new_ooi.start_angle = angle;
+				new_ooi.start_x = x;
+				new_ooi.start_y = y;
+				new_ooi.num_points = 0;
+			} else if (distance < new_ooi.start_distance + 0.06)
+			{
+				// cout << "ADD " << angle << " np " << new_ooi.num_points << std::endl;
+				// Punkt hat bis auf 60mm den gleichen Abstand wie der Startpunkt
+				new_ooi.num_points++;
+				new_ooi.end_distance = distance;
+				new_ooi.end_angle = angle;
+				new_ooi.end_x = x;
+				new_ooi.end_y = y;
+			} else if (new_ooi.num_points >= 3)
+			{
+				auto ooi_width = sqrt(pow(new_ooi.start_x - new_ooi.end_x, 2)
+								+ pow(new_ooi.start_y - new_ooi.end_y, 2));
+				// cout << "OBJ at " << new_ooi.start_angle << " / " << ooi.start_distance << " / " << ooi_width << std::endl;
+				if (ooi_width >= 0.03 && ooi_width <= 0.1)
+				{
+					// cout << "Replacing OOI" << endl;
+					ooi.start_angle = new_ooi.start_angle;
+					ooi.start_distance = new_ooi.start_distance;
+					ooi.start_x = new_ooi.start_x;
+					ooi.start_y = new_ooi.start_y;
+					ooi.end_angle = new_ooi.end_angle;
+					ooi.end_distance = new_ooi.end_distance;
+					ooi.end_x = new_ooi.end_x;
+					ooi.end_y = new_ooi.end_y;
+					ooi.num_points = new_ooi.num_points;
+				}
+			}
+			/*if (angleDeg < 60 || angleDeg > 300) {
 				// Front
 #if RECORD_RAW
 				fs << "F\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
@@ -117,10 +163,28 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 					fs << "I\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
 				}
 #endif
+			}*/
+		}
+		if (ooi.num_points >=3)
+		{
+			auto mid_ooi_angle = (ooi.start_angle + ooi.end_angle) * 0.5;
+			auto mid_ooi_distance = (ooi.start_distance + ooi.end_distance) * 0.5;
+
+			if (mid_ooi_angle > last_mid_ooi_angle + 5
+					|| mid_ooi_angle < last_mid_ooi_angle - 5
+					|| mid_ooi_distance > last_mid_ooi_distance + 0.08
+					|| mid_ooi_distance < last_mid_ooi_distance - 0.08)
+			{
+				std::ostringstream object_description;
+				cout << object_description.str() << endl;
+				object_description << setprecision(3) << "Detected object of interest at " << mid_ooi_angle << " degrees and " << mid_ooi_distance << " meters distance.";
+				ev3dev::sound::speak(object_description.str(), true);
+				last_mid_ooi_angle = mid_ooi_angle;
+				last_mid_ooi_distance = mid_ooi_distance;
 			}
 		}
 
-		convertToXY(minDistFront, angleToMinDistFront, &x, &y);
+		/*convertToXY(minDistFront, angleToMinDistFront, &x, &y);
 		auto weight = 1.33 - (((pow(x, 2.0) / pow(ELLIPSE_RADIUS_X, 2.0)) + (pow(y, 2.0) / pow(ELLIPSE_RADIUS_Y, 2.0))));
 
 		cout << "front: " << minDistFront << "\t" << angleToMinDistFrontDeg
@@ -131,7 +195,7 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 			 * The closer the obstacle, the higher the weight.
 			 * Maximum is weight 1.33
 			 */
-			if (weight <= 1.18) {
+			/*if (weight <= 1.18) {
 				if (angleToMinDistFrontDeg > 180.0) {
 					steerTo = MIN_STEER_ANGLE * weight;
 					cout << "right: " << steerTo << " w: " << weight << endl;
@@ -172,7 +236,7 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 				car.setDriveSpeed(0);
 				newState = CRUISE;
 			}
-		}
+		}*/
 	}
 
 	//auto end = std::chrono::high_resolution_clock::now();

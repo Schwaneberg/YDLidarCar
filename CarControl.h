@@ -26,6 +26,7 @@ public:
 	#define MAX_STEER_ANGLE 30
 	#define MIN_STEER_ANGLE	-30
 	#define STEER_MOTOR_SPEED 350
+	#define FORK_MOTOR_SPEED 200
 
 	/*
 	 * HOLD = Motor holds position
@@ -114,6 +115,10 @@ public:
 	 * @return current state of steering motor
 	 */
 	steerState getSteeringState();
+
+	bool openFork();
+
+	bool closeFork();
 private:
 	CarControl();
 	virtual ~CarControl();

@@ -11,6 +11,31 @@
 #include "CarControl.h"
 #include "Lidar.h"
 
+class ObjectOfInterest {
+public:
+	ObjectOfInterest():
+		start_angle(0),
+		end_angle(0),
+		start_distance(1000000),
+		end_distance(1000000),
+		start_x(0),
+		start_y(0),
+		end_x(0),
+		end_y(0),
+		num_points(0)
+	{};
+
+	float start_angle;
+	float end_angle;
+	float start_distance;
+	float end_distance;
+	float start_x;
+	float start_y;
+	float end_x;
+	float end_y;
+	int num_points;
+};
+
 
 class CruiseControl {
 public:
