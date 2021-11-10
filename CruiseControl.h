@@ -56,6 +56,7 @@ private:
 #define PI 3.1415926535f
 #define CRUISE_SPEED		35
 #define STEER_SPEED			35
+#define CORNERING_SPEED     20
 #define REVERSE_SPEED		-20
 
 	/*

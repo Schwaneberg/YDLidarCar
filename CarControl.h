@@ -105,6 +105,11 @@ public:
 	 */
 	void setDriveSpeed(int percent);
 
+	/*
+	 * Stop drive motor
+	 */
+	void stop();
+
 	
 	/*
 	 * @return true if drive is stalled

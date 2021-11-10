@@ -62,7 +62,7 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 	prev_time = now;*/
 	std::chrono::duration<double> elapsed = now - collisionTime;
 	elapsed = now - reversionTime;
-	bool reversionTimeLock = elapsed.count() < 3.5;
+	bool reversionTimeLock = elapsed.count() < 1.5;
 #if RECORD_RAW
 	static uint32_t count = 0;
 	std::fstream fs;
@@ -70,6 +70,7 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 	fs << "NEW DATA " << count++ << endl;
 #endif
 	if (isDriveOverloaded) {
+		cout << "OVERLOAD" << endl;
 		if (prevState == REVERSING) {
 			newState = STEERING;
 			car.steerStraight();
@@ -138,32 +139,6 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 					ooi.num_points = new_ooi.num_points;
 				}
 			}
-			/*if (angleDeg < 60 || angleDeg > 300) {
-				// Front
-#if RECORD_RAW
-				fs << "F\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
-#endif
-				if (isWithinEllipse(x, y) && distance < minDistFront) {
-					minDistFront = distance;
-					angleToMinDistFrontDeg = angleDeg;
-					angleToMinDistFront = angle;
-				}
-			} else if (angleDeg > 120 && angleDeg < 240) {
-				// Back
-#if RECORD_RAW
-				fs << "B\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
-#endif
-				if (isWithinEllipse(x, y)
-						&& distance < minDistBack) {
-					minDistBack = distance;
-				}
-
-#if RECORD_RAW
-				else {
-					fs << "I\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
-				}
-#endif
-			}*/
 		}
 		if (ooi.num_points >=3)
 		{
@@ -177,10 +152,56 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 			{
 				std::ostringstream object_description;
 				cout << object_description.str() << endl;
-				object_description << setprecision(3) << "Detected object of interest at " << mid_ooi_angle << " degrees and " << mid_ooi_distance << " meters distance.";
-				ev3dev::sound::speak(object_description.str(), true);
+				object_description << setprecision(3) << "Detected object at " << mid_ooi_angle << " degrees and " << mid_ooi_distance << " meters distance.";
+				cout << object_description.str() << endl;
+				ev3dev::sound::speak(object_description.str(), false);
 				last_mid_ooi_angle = mid_ooi_angle;
 				last_mid_ooi_distance = mid_ooi_distance;
+			}
+
+			if (last_mid_ooi_angle > 3 && last_mid_ooi_angle < 357)
+			{
+				cout << "a: " << last_mid_ooi_angle << " d: " << last_mid_ooi_distance << endl;
+				// Wenden
+				if (!reversionTimeLock)
+				{
+					if (newState != REVERSING)
+					{
+						cout << "GO" << endl;
+						car.setDriveSpeed(REVERSE_SPEED);
+						auto curSteerDeg = car.getSteerDegree();
+						car.steerHardLeft();
+						newState = REVERSING;
+						reversionTime = std::chrono::high_resolution_clock::now();
+					} else if (newState == REVERSING) {
+						cout << "REV" << endl;
+						reversionTime = std::chrono::high_resolution_clock::now();
+						car.setDriveSpeed(CORNERING_SPEED);
+						car.steerToPos(car.getSteerPos() * -1);
+						newState = CRUISE;
+					}
+				}
+				else {
+					cout << "lock" << endl;
+				}
+			}
+			else{
+				if (car.getSteerDegree() != 0)
+				{
+					car.stop();
+					car.steerStraight();
+				}
+				if (mid_ooi_distance > 0.36)
+				{
+					car.setDriveSpeed(REVERSE_SPEED);
+					newState = REVERSING;
+				}
+				else
+				{
+					newState = IDLE;
+					car.stop();
+					car.closeFork();
+				}
 			}
 		}
 

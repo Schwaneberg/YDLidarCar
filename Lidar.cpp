@@ -43,7 +43,7 @@ Lidar::Lidar() {
 	cylidar.setAutoReconnect(true);//hot plug
 	cylidar.setReversion(false);
 	cylidar.setFixedResolution(false);
-	cylidar.setScanFrequency(8);
+	cylidar.setScanFrequency(5);
 	cylidar.initialize();
 }
 
