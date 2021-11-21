@@ -24,27 +24,80 @@ Lidar::Lidar() {
 	 * Note: the baudrate must be altered for
 	 * other types.
 	 */
+	ydlidar::os_init();
 	baudrate = 128000;
-	std::string intensity;
-	ydlidar::init(0, nullptr);
-	std::map<std::string, std::string> ports =  ydlidar::YDlidarDriver::lidarPortList();
-	std::map<std::string,std::string>::iterator it;
-	if(ports.size()==1) {
-		it = ports.begin();
-		port = it->second;
-	} else {
-		std::cerr << "Did not detect YDLidar port!" << std::endl;
-	}
-	std::cout << "Port: " << port << std::endl;
 
-	cylidar.setSerialPort(port);
-	cylidar.setSerialBaudrate(baudrate);
-	cylidar.setIntensities(false);
-	cylidar.setAutoReconnect(true);//hot plug
-	cylidar.setReversion(false);
-	cylidar.setFixedResolution(false);
-	cylidar.setScanFrequency(5);
-	cylidar.initialize();
+	//////////////////////string property/////////////////
+	/// lidar port
+	laser.setlidaropt(LidarPropSerialPort, port.c_str(), port.size());
+	/// ignore array
+	std::string ignore_array;
+	ignore_array.clear();
+	laser.setlidaropt(LidarPropIgnoreArray, ignore_array.c_str(),
+					ignore_array.size());
+
+	//////////////////////int property/////////////////
+	/// lidar baudrate
+	laser.setlidaropt(LidarPropSerialBaudrate, &baudrate, sizeof(int));
+	/// tof lidar
+	int optval = TYPE_TRIANGLE;
+	laser.setlidaropt(LidarPropLidarType, &optval, sizeof(int));
+	/// device type
+	optval = YDLIDAR_TYPE_SERIAL;
+	laser.setlidaropt(LidarPropDeviceType, &optval, sizeof(int));
+	/// sample rate
+	optval = 3; // or 4?
+	laser.setlidaropt(LidarPropSampleRate, &optval, sizeof(int));
+	/// abnormal count
+	optval = 4;
+	laser.setlidaropt(LidarPropAbnormalCheckCount, &optval, sizeof(int));
+
+	//////////////////////bool property/////////////////
+	/// fixed angle resolution
+	bool b_optvalue = false;
+	laser.setlidaropt(LidarPropFixedResolution, &b_optvalue, sizeof(bool));
+	/// rotate 180
+	laser.setlidaropt(LidarPropReversion, &b_optvalue, sizeof(bool));
+	/// Counterclockwise
+	laser.setlidaropt(LidarPropInverted, &b_optvalue, sizeof(bool));
+	b_optvalue = true;
+	laser.setlidaropt(LidarPropAutoReconnect, &b_optvalue, sizeof(bool));
+	/// one-way communication
+	laser.setlidaropt(LidarPropSingleChannel, &b_optvalue, sizeof(bool));
+	/// intensity
+	b_optvalue = false;
+	laser.setlidaropt(LidarPropIntenstiy, &b_optvalue, sizeof(bool));
+	/// Motor DTR
+	b_optvalue = true;
+	laser.setlidaropt(LidarPropSupportMotorDtrCtrl, &b_optvalue, sizeof(bool));
+	/// HeartBeat
+	b_optvalue = false;
+	laser.setlidaropt(LidarPropSupportHeartBeat, &b_optvalue, sizeof(bool));
+
+	//////////////////////float property/////////////////
+	/// unit: °
+	float f_optvalue = 180.0f;
+	float frequency = 5.0;
+	laser.setlidaropt(LidarPropMaxAngle, &f_optvalue, sizeof(float));
+	f_optvalue = -180.0f;
+	laser.setlidaropt(LidarPropMinAngle, &f_optvalue, sizeof(float));
+	/// unit: m
+	f_optvalue = 64.f;
+	laser.setlidaropt(LidarPropMaxRange, &f_optvalue, sizeof(float));
+	f_optvalue = 0.05f;
+	laser.setlidaropt(LidarPropMinRange, &f_optvalue, sizeof(float));
+	/// unit: Hz
+	laser.setlidaropt(LidarPropScanFrequency, &frequency, sizeof(float));
+
+	bool ret = laser.initialize();
+
+	if (ret) {
+	ret = laser.turnOn();
+	} else {
+	fprintf(stderr, "%s\n", laser.DescribeError());
+	fflush(stderr);
+	}
+
 }
 
 Lidar::~Lidar() {}
@@ -57,52 +110,7 @@ Lidar& Lidar::getInstance()
 
 bool Lidar::isReady()
 {
-	return ydlidar::ok();
-}
-
-std::vector<std::tuple<float, float>> Lidar::scan() {
-	/*
-	 * Assuming a resolution of 0.5 degree at
-	 * standard scan speed of 8 Hz
-	 */
-	static node_info nodes[720];
-	static size_t count = _countof(nodes);
-	std::vector<std::tuple<float, float>> scanData;
-	//  wait Scan data:
-	//uint64_t tim_scan_start = getCurrentTime();
-	while (!IS_OK(cylidar.lidarPtr->grabScanData(nodes, count))) {
-		std::cout << "sleep" << std::endl;
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	};
-	//uint64_t tim_scan_end = getCurrentTime();
-
-	auto op_result = cylidar.lidarPtr->ascendScanData(nodes, count);
-
-	if (IS_OK(op_result)) {
-#if LOGGING
-		static auto scan_count = 0;
-		ofstream logfile;
-		logfile.open("points.json", ofstream::app | ofstream::out);
-		logfile << ++scan_count << ": {";
-#endif
-		for (unsigned int i = 0; i < count; i++) {
-			if (nodes[i].distance_q2 != 0) {
-				float angle = (float)((nodes[i].angle_q6_checkbit >> LIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f);
-				scanData.push_back(std::make_tuple(angle, nodes[i].distance_q2 / 4000.0f));
-#if LOGGING
-				if (scanData.size() > 1) {
-					logfile << ", ";
-				}
-				logfile << angle << ": " << nodes[i].distance_q2 / 4000.0f;
-#endif
-			}
-		}
-#if LOGGING
-		logfile << "}" << endl;
-		logfile.close();
-#endif
-	}
-	return scanData;
+	return ydlidar::os_isOk();
 }
 
 }

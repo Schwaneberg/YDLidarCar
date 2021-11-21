@@ -40,7 +40,7 @@ void CruiseControl::convertToXY(float distance, float angle, float *x, float *y)
 /*
  * Process scan data and control car.
  */
-void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
+void CruiseControl::processScan(LaserScan &scanData)
 {
 	static auto collisionTime = std::chrono::high_resolution_clock::now() - std::chrono::seconds(5);
 	static auto reversionTime = std::chrono::high_resolution_clock::now() - std::chrono::seconds(5);
@@ -87,37 +87,35 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 			car.setDriveSpeed(REVERSE_SPEED);
 		}
 	} else if (!reversionTimeLock) {
-		for (auto tuple : scanData) {
+		for (auto tuple : scanData.points) {
 
 			// current angle
 
-			auto angleDeg = std::get<0>(tuple);
-			auto distance = std::get<1>(tuple);
-			auto angle = angleDeg * (PI / 180.0f);
+			// auto angle = tuple.angle * (PI / 180.0f);
 			//current intensity
 			//int intensity = scan.intensities[i];
-			convertToXY(distance, angle, &x, &y);
+			convertToXY(tuple.range, tuple.angle, &x, &y);
 #if RECORD_RAW
 				fs << "F\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
 #endif
 
 
-			if (distance <= 1.0 && distance < new_ooi.start_distance - 0.06)
+			if (tuple.range <= 1.0 && tuple.range < new_ooi.start_distance - 0.06)
 			{
 				// cout << "START " << angle << std::endl;
 				// Merke neuen Startpunkt
-				new_ooi.start_distance = distance;
-				new_ooi.start_angle = angle;
+				new_ooi.start_distance = tuple.range;
+				new_ooi.start_angle = tuple.angle;
 				new_ooi.start_x = x;
 				new_ooi.start_y = y;
 				new_ooi.num_points = 0;
-			} else if (distance < new_ooi.start_distance + 0.06)
+			} else if (tuple.range < new_ooi.start_distance + 0.06)
 			{
 				// cout << "ADD " << angle << " np " << new_ooi.num_points << std::endl;
 				// Punkt hat bis auf 60mm den gleichen Abstand wie der Startpunkt
 				new_ooi.num_points++;
-				new_ooi.end_distance = distance;
-				new_ooi.end_angle = angle;
+				new_ooi.end_distance = tuple.range;
+				new_ooi.end_angle = tuple.angle;
 				new_ooi.end_x = x;
 				new_ooi.end_y = y;
 			} else if (new_ooi.num_points >= 3)
@@ -281,7 +279,9 @@ void CruiseControl::start() {
 			//ev3dev::sound::play("lidar.wav");
 			//this_thread::sleep_for(chrono::milliseconds(3000));
 			while (1) {
-				processScan(lidar.scan());
+				if (lidar.laser.doProcessSimple(scan)) {
+					processScan(scan);
+				}
 			}
 		} else {
 			ev3dev::sound::speak("Lidar is not working!", true);
