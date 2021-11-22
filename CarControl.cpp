@@ -28,7 +28,7 @@ CarControl::~CarControl() {
 bool CarControl::openFork()
 {
 	forkMotor.set_stop_action("coast");
-	forkMotor.set_polarity("inversed").set_speed_sp(FORK_MOTOR_SPEED).set_position_sp(80).run_to_abs_pos();
+	forkMotor.set_polarity("inversed").set_speed_sp(FORK_MOTOR_SPEED).set_position_sp(60).run_to_abs_pos();
 	//while (forkMotor.state().count("stalled") == 0 && forkMotor.state().count("overloaded") == 0);
 	//forkMotor.stop();
 	std::cout << "FMP " << forkMotor.position() << std::endl;

@@ -87,16 +87,20 @@ void CruiseControl::processScan(LaserScan &scanData)
 			car.setDriveSpeed(REVERSE_SPEED);
 		}
 	} else if (!reversionTimeLock) {
+		std::sort(std::begin(scanData.points), std::end(scanData.points), [](LaserPoint a, LaserPoint b) {auto an_a = a.angle > 0 ? a.angle : 2*PI + a.angle; auto an_b = b.angle > 0 ? b.angle : 2*PI + b.angle; return an_a < an_b;});
 		for (auto tuple : scanData.points) {
 
-			// current angle
+			if (tuple.range == 0)
+				continue;
 
-			// auto angle = tuple.angle * (PI / 180.0f);
+			auto angle = tuple.angle * (180.0f / PI);
+			if (angle < 0)
+				angle += 360.0f;
 			//current intensity
 			//int intensity = scan.intensities[i];
-			convertToXY(tuple.range, tuple.angle, &x, &y);
+			convertToXY(tuple.range, angle, &x, &y);
 #if RECORD_RAW
-				fs << "F\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
+				fs << "F\t" << x << "\t" << y << "\t:\t" << angle << "\t" << tuple.range << endl;
 #endif
 
 
@@ -105,7 +109,7 @@ void CruiseControl::processScan(LaserScan &scanData)
 				// cout << "START " << angle << std::endl;
 				// Merke neuen Startpunkt
 				new_ooi.start_distance = tuple.range;
-				new_ooi.start_angle = tuple.angle;
+				new_ooi.start_angle = angle;
 				new_ooi.start_x = x;
 				new_ooi.start_y = y;
 				new_ooi.num_points = 0;
@@ -115,14 +119,15 @@ void CruiseControl::processScan(LaserScan &scanData)
 				// Punkt hat bis auf 60mm den gleichen Abstand wie der Startpunkt
 				new_ooi.num_points++;
 				new_ooi.end_distance = tuple.range;
-				new_ooi.end_angle = tuple.angle;
+				new_ooi.end_angle = angle;
 				new_ooi.end_x = x;
 				new_ooi.end_y = y;
 			} else if (new_ooi.num_points >= 3)
 			{
 				auto ooi_width = sqrt(pow(new_ooi.start_x - new_ooi.end_x, 2)
 								+ pow(new_ooi.start_y - new_ooi.end_y, 2));
-				// cout << "OBJ at " << new_ooi.start_angle << " / " << ooi.start_distance << " / " << ooi_width << std::endl;
+				cout << "OBJ at " << new_ooi.start_angle << " / " << ooi.start_distance << " / " << ooi_width << std::endl;
+				cout << "sx " << new_ooi.start_x << " ex "<< new_ooi.end_x << " sy " << new_ooi.start_y << " ey " << new_ooi.end_y << std::endl;
 				if (ooi_width >= 0.03 && ooi_width <= 0.1)
 				{
 					// cout << "Replacing OOI" << endl;

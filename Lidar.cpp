@@ -29,6 +29,7 @@ Lidar::Lidar() {
 
 	//////////////////////string property/////////////////
 	/// lidar port
+	port = "/dev/ttyUSB0";
 	laser.setlidaropt(LidarPropSerialPort, port.c_str(), port.size());
 	/// ignore array
 	std::string ignore_array;
@@ -46,10 +47,10 @@ Lidar::Lidar() {
 	optval = YDLIDAR_TYPE_SERIAL;
 	laser.setlidaropt(LidarPropDeviceType, &optval, sizeof(int));
 	/// sample rate
-	optval = 3; // or 4?
+	optval = 5; // or 4?
 	laser.setlidaropt(LidarPropSampleRate, &optval, sizeof(int));
 	/// abnormal count
-	optval = 4;
+	optval = 10;
 	laser.setlidaropt(LidarPropAbnormalCheckCount, &optval, sizeof(int));
 
 	//////////////////////bool property/////////////////
@@ -62,10 +63,10 @@ Lidar::Lidar() {
 	laser.setlidaropt(LidarPropInverted, &b_optvalue, sizeof(bool));
 	b_optvalue = true;
 	laser.setlidaropt(LidarPropAutoReconnect, &b_optvalue, sizeof(bool));
+	b_optvalue = false;
 	/// one-way communication
 	laser.setlidaropt(LidarPropSingleChannel, &b_optvalue, sizeof(bool));
 	/// intensity
-	b_optvalue = false;
 	laser.setlidaropt(LidarPropIntenstiy, &b_optvalue, sizeof(bool));
 	/// Motor DTR
 	b_optvalue = true;
@@ -82,9 +83,9 @@ Lidar::Lidar() {
 	f_optvalue = -180.0f;
 	laser.setlidaropt(LidarPropMinAngle, &f_optvalue, sizeof(float));
 	/// unit: m
-	f_optvalue = 64.f;
+	f_optvalue = 10.f;
 	laser.setlidaropt(LidarPropMaxRange, &f_optvalue, sizeof(float));
-	f_optvalue = 0.05f;
+	f_optvalue = 0.12f;
 	laser.setlidaropt(LidarPropMinRange, &f_optvalue, sizeof(float));
 	/// unit: Hz
 	laser.setlidaropt(LidarPropScanFrequency, &frequency, sizeof(float));
