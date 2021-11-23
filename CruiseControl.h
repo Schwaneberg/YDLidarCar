@@ -57,8 +57,8 @@ private:
 #define PI 3.1415926535f
 #define CRUISE_SPEED		35
 #define STEER_SPEED			35
-#define CORNERING_SPEED     20
-#define REVERSE_SPEED		-20
+#define CORNERING_SPEED     10
+#define REVERSE_SPEED		-10
 
 	/*
 	 * The ELLIPSE_RADIUS_X and _Y define the elliptical shape around

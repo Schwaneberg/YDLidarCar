@@ -33,8 +33,8 @@ bool CruiseControl::isWithinEllipse(float x, float y)
  */
 void CruiseControl::convertToXY(float distance, float angle, float *x, float *y)
 {
-	*y = distance * cos(angle);
-	*x = distance * sin(angle);
+	*y = distance * cos(angle * PI/180.0f);
+	*x = distance * sin(angle * PI/180.0f);
 }
 
 /*
@@ -86,7 +86,7 @@ void CruiseControl::processScan(LaserScan &scanData)
 			}
 			car.setDriveSpeed(REVERSE_SPEED);
 		}
-	} else if (!reversionTimeLock) {
+	} else {
 		std::sort(std::begin(scanData.points), std::end(scanData.points), [](LaserPoint a, LaserPoint b) {auto an_a = a.angle > 0 ? a.angle : 2*PI + a.angle; auto an_b = b.angle > 0 ? b.angle : 2*PI + b.angle; return an_a < an_b;});
 		for (auto tuple : scanData.points) {
 
@@ -126,11 +126,10 @@ void CruiseControl::processScan(LaserScan &scanData)
 			{
 				auto ooi_width = sqrt(pow(new_ooi.start_x - new_ooi.end_x, 2)
 								+ pow(new_ooi.start_y - new_ooi.end_y, 2));
-				cout << "OBJ at " << new_ooi.start_angle << " / " << ooi.start_distance << " / " << ooi_width << std::endl;
-				cout << "sx " << new_ooi.start_x << " ex "<< new_ooi.end_x << " sy " << new_ooi.start_y << " ey " << new_ooi.end_y << std::endl;
+				// cout << "OBJ at " << new_ooi.start_angle << " / " << ooi.start_distance << " / " << ooi_width << std::endl;
+				// cout << "sx " << new_ooi.start_x << " ex "<< new_ooi.end_x << " sy " << new_ooi.start_y << " ey " << new_ooi.end_y << std::endl;
 				if (ooi_width >= 0.03 && ooi_width <= 0.1)
 				{
-					// cout << "Replacing OOI" << endl;
 					ooi.start_angle = new_ooi.start_angle;
 					ooi.start_distance = new_ooi.start_distance;
 					ooi.start_x = new_ooi.start_x;
@@ -161,8 +160,12 @@ void CruiseControl::processScan(LaserScan &scanData)
 				last_mid_ooi_angle = mid_ooi_angle;
 				last_mid_ooi_distance = mid_ooi_distance;
 			}
+			else {
+				last_mid_ooi_angle = mid_ooi_angle;
+				last_mid_ooi_distance = mid_ooi_distance;
+			}
 
-			if (last_mid_ooi_angle > 3 && last_mid_ooi_angle < 357)
+			if (last_mid_ooi_angle < 177 || last_mid_ooi_angle > 183)
 			{
 				cout << "a: " << last_mid_ooi_angle << " d: " << last_mid_ooi_distance << endl;
 				// Wenden
@@ -183,9 +186,6 @@ void CruiseControl::processScan(LaserScan &scanData)
 						car.steerToPos(car.getSteerPos() * -1);
 						newState = CRUISE;
 					}
-				}
-				else {
-					cout << "lock" << endl;
 				}
 			}
 			else{
@@ -283,9 +283,11 @@ void CruiseControl::start() {
 		if (lidar.isReady()) {
 			//ev3dev::sound::play("lidar.wav");
 			//this_thread::sleep_for(chrono::milliseconds(3000));
+			unsigned int count = 0;
 			while (1) {
 				if (lidar.laser.doProcessSimple(scan)) {
-					processScan(scan);
+					if (count++ % 8 == 0)
+						processScan(scan);
 				}
 			}
 		} else {
