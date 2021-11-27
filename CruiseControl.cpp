@@ -33,14 +33,14 @@ bool CruiseControl::isWithinEllipse(float x, float y)
  */
 void CruiseControl::convertToXY(float distance, float angle, float *x, float *y)
 {
-	*y = distance * cos(angle * PI/180.0f);
-	*x = distance * sin(angle * PI/180.0f);
+	*y = distance * cos(angle);
+	*x = distance * sin(angle);
 }
 
 /*
  * Process scan data and control car.
  */
-void CruiseControl::processScan(LaserScan &scanData)
+void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 {
 	static auto collisionTime = std::chrono::high_resolution_clock::now() - std::chrono::seconds(5);
 	static auto reversionTime = std::chrono::high_resolution_clock::now() - std::chrono::seconds(5);
@@ -87,39 +87,37 @@ void CruiseControl::processScan(LaserScan &scanData)
 			car.setDriveSpeed(REVERSE_SPEED);
 		}
 	} else {
-		std::sort(std::begin(scanData.points), std::end(scanData.points), [](LaserPoint a, LaserPoint b) {auto an_a = a.angle > 0 ? a.angle : 2*PI + a.angle; auto an_b = b.angle > 0 ? b.angle : 2*PI + b.angle; return an_a < an_b;});
-		for (auto tuple : scanData.points) {
+		//std::sort(std::begin(scanData.points), std::end(scanData.points), [](LaserPoint a, LaserPoint b) {auto an_a = a.angle > 0 ? a.angle : 2*PI + a.angle; auto an_b = b.angle > 0 ? b.angle : 2*PI + b.angle; return an_a < an_b;});
+		for (auto tuple : scanData) {
 
-			if (tuple.range == 0)
-				continue;
+			/*if (tuple.range == 0)
+				continue;*/
 
-			auto angle = tuple.angle * (180.0f / PI);
-			if (angle < 0)
-				angle += 360.0f;
-			//current intensity
-			//int intensity = scan.intensities[i];
-			convertToXY(tuple.range, angle, &x, &y);
+			auto angleDeg = std::get<0>(tuple);
+			auto distance = std::get<1>(tuple);
+			auto angle = angleDeg * (PI / 180.0f);
+			convertToXY(distance, angle, &x, &y);
 #if RECORD_RAW
-				fs << "F\t" << x << "\t" << y << "\t:\t" << angle << "\t" << tuple.range << endl;
+				fs << "F\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
 #endif
 
 
-			if (tuple.range <= 1.0 && tuple.range < new_ooi.start_distance - 0.06)
+			if (distance <= 1.0 && distance < new_ooi.start_distance - 0.06)
 			{
 				// cout << "START " << angle << std::endl;
 				// Merke neuen Startpunkt
-				new_ooi.start_distance = tuple.range;
-				new_ooi.start_angle = angle;
+				new_ooi.start_distance = distance;
+				new_ooi.start_angle = angleDeg;
 				new_ooi.start_x = x;
 				new_ooi.start_y = y;
 				new_ooi.num_points = 0;
-			} else if (tuple.range < new_ooi.start_distance + 0.06)
+			} else if (distance < new_ooi.start_distance + 0.06)
 			{
 				// cout << "ADD " << angle << " np " << new_ooi.num_points << std::endl;
 				// Punkt hat bis auf 60mm den gleichen Abstand wie der Startpunkt
 				new_ooi.num_points++;
-				new_ooi.end_distance = tuple.range;
-				new_ooi.end_angle = angle;
+				new_ooi.end_distance = distance;
+				new_ooi.end_angle = angleDeg;
 				new_ooi.end_x = x;
 				new_ooi.end_y = y;
 			} else if (new_ooi.num_points >= 3)
@@ -156,7 +154,7 @@ void CruiseControl::processScan(LaserScan &scanData)
 				cout << object_description.str() << endl;
 				object_description << setprecision(3) << "Detected object at " << mid_ooi_angle << " degrees and " << mid_ooi_distance << " meters distance.";
 				cout << object_description.str() << endl;
-				ev3dev::sound::speak(object_description.str(), false);
+				//ev3dev::sound::speak(object_description.str(), false);
 				last_mid_ooi_angle = mid_ooi_angle;
 				last_mid_ooi_distance = mid_ooi_distance;
 			}
@@ -167,37 +165,48 @@ void CruiseControl::processScan(LaserScan &scanData)
 
 			if (last_mid_ooi_angle < 177 || last_mid_ooi_angle > 183)
 			{
-				cout << "a: " << last_mid_ooi_angle << " d: " << last_mid_ooi_distance << endl;
+				//cout << "a: " << last_mid_ooi_angle << " d: " << last_mid_ooi_distance << endl;
 				// Wenden
 				if (!reversionTimeLock)
 				{
-					if (newState != REVERSING)
+					if (prevState != REVERSING)
 					{
 						cout << "GO" << endl;
 						car.setDriveSpeed(REVERSE_SPEED);
 						auto curSteerDeg = car.getSteerDegree();
-						car.steerHardLeft();
+						if (last_mid_ooi_angle > 180)
+							car.steerHardLeft();
+						else
+							car.steerHardRight();
 						newState = REVERSING;
 						reversionTime = std::chrono::high_resolution_clock::now();
-					} else if (newState == REVERSING) {
+					} else if (prevState == REVERSING) {
 						cout << "REV" << endl;
 						reversionTime = std::chrono::high_resolution_clock::now();
 						car.setDriveSpeed(CORNERING_SPEED);
-						car.steerToPos(car.getSteerPos() * -1);
+						if (last_mid_ooi_angle < 180)
+							car.steerHardLeft();
+						else
+							car.steerHardRight();
 						newState = CRUISE;
 					}
 				}
 			}
 			else{
-				if (car.getSteerDegree() != 0)
+				auto steer_deg = car.getSteerDegree();
+				if (prevState != STOP && (steer_deg > 1 || steer_deg < -1))
 				{
 					car.stop();
 					car.steerStraight();
+					newState = STOP;
 				}
-				if (mid_ooi_distance > 0.36)
+				else if (mid_ooi_distance > 0.25)
 				{
-					car.setDriveSpeed(REVERSE_SPEED);
-					newState = REVERSING;
+					if (prevState != REVERSING)
+					{
+						car.setDriveSpeed(REVERSE_SPEED);
+						newState = REVERSING;
+					}
 				}
 				else
 				{
@@ -283,12 +292,8 @@ void CruiseControl::start() {
 		if (lidar.isReady()) {
 			//ev3dev::sound::play("lidar.wav");
 			//this_thread::sleep_for(chrono::milliseconds(3000));
-			unsigned int count = 0;
 			while (1) {
-				if (lidar.laser.doProcessSimple(scan)) {
-					if (count++ % 8 == 0)
-						processScan(scan);
-				}
+				processScan(lidar.scan());
 			}
 		} else {
 			ev3dev::sound::speak("Lidar is not working!", true);

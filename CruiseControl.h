@@ -8,7 +8,6 @@
 #ifndef CRUISECONTROL_H_
 #define CRUISECONTROL_H_
 
-#include <CYdLidar.h>
 #include "CarControl.h"
 #include "Lidar.h"
 
@@ -51,7 +50,7 @@ public:
 
 private:
 	enum carState {IDLE, CRUISE, REVERSING, STEERING, STOP};
-	static void processScan(LaserScan &scanData);
+	static void processScan(std::vector<std::tuple<float, float>> scanData);
 	static bool isWithinEllipse(float distance, float angle);
 	static void convertToXY(float distance, float angle, float *x, float *y);
 #define PI 3.1415926535f
