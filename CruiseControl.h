@@ -49,15 +49,15 @@ public:
 	void start();
 
 private:
-	enum carState {IDLE, CRUISE, REVERSING, STEERING, STOP};
+	enum carState {IDLE, CRUISE, REVERSING, STEERING, STOP, TOWING};
 	static void processScan(std::vector<std::tuple<float, float>> scanData);
 	static bool isWithinEllipse(float distance, float angle);
 	static void convertToXY(float distance, float angle, float *x, float *y);
 #define PI 3.1415926535f
 #define CRUISE_SPEED		35
 #define STEER_SPEED			35
-#define CORNERING_SPEED     10
-#define REVERSE_SPEED		-10
+#define CORNERING_SPEED     15
+#define REVERSE_SPEED		-15
 
 	/*
 	 * The ELLIPSE_RADIUS_X and _Y define the elliptical shape around

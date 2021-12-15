@@ -38,7 +38,7 @@ bool CarControl::openFork()
 bool CarControl::closeFork()
 {
 	forkMotor.set_stop_action("hold");
-	forkMotor.set_polarity("normal").set_speed_sp(FORK_MOTOR_SPEED).run_forever();
+	forkMotor.set_polarity("normal").set_duty_cycle_sp(100).set_speed_sp(FORK_MOTOR_SPEED).run_forever();
 	while (forkMotor.state().count("stalled") == 0 && forkMotor.state().count("overloaded") == 0);
 	forkMotor.stop();
 	forkMotor.set_position(0);
@@ -152,15 +152,21 @@ CarControl::steerState CarControl::getSteeringState()
 
 void CarControl::setDriveSpeed(int percent)
 {
-	static int previously = 0;
-	if (percent != previously) {
-		driveMotor.set_speed_sp((driveMotor.max_speed()/100) * percent).run_forever();
-		previously = percent;
+	auto target_speed = (driveMotor.max_speed()/100) * percent;
+	if (driveMotor.speed_sp() != target_speed) {
+		driveMotor.set_speed_sp(target_speed).run_forever();
+		std::cout << "speed" << target_speed << std::endl;
 	}
+}
+
+int CarControl::getDriveSpeed()
+{
+	return driveMotor.speed_sp() * 100 / driveMotor.max_speed();
 }
 
 void CarControl::stop()
 {
+	std::cout << "STOP" << std::endl;
 	driveMotor.stop();
 }
 

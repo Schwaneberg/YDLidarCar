@@ -105,6 +105,9 @@ public:
 	 */
 	void setDriveSpeed(int percent);
 
+
+	int getDriveSpeed();
+
 	/*
 	 * Stop drive motor
 	 */

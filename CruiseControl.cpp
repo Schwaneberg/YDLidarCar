@@ -63,6 +63,7 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 	std::chrono::duration<double> elapsed = now - collisionTime;
 	elapsed = now - reversionTime;
 	bool reversionTimeLock = elapsed.count() < 1.5;
+	bool quickLock = elapsed.count() < 0.4;
 #if RECORD_RAW
 	static uint32_t count = 0;
 	std::fstream fs;
@@ -87,7 +88,8 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 			car.setDriveSpeed(REVERSE_SPEED);
 		}
 	} else {
-		//std::sort(std::begin(scanData.points), std::end(scanData.points), [](LaserPoint a, LaserPoint b) {auto an_a = a.angle > 0 ? a.angle : 2*PI + a.angle; auto an_b = b.angle > 0 ? b.angle : 2*PI + b.angle; return an_a < an_b;});
+		float dist_left = -1;
+		float dist_right = -1;
 		for (auto tuple : scanData) {
 
 			/*if (tuple.range == 0)
@@ -100,7 +102,10 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 #if RECORD_RAW
 				fs << "F\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
 #endif
-
+			if (angleDeg > 0.0 && angleDeg <= 15.0 && dist_right < distance)
+				dist_right = distance;
+			else if (angleDeg >= 345.0 && dist_right < distance)
+				dist_left = distance;
 
 			if (distance <= 1.0 && distance < new_ooi.start_distance - 0.06)
 			{
@@ -140,7 +145,23 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 				}
 			}
 		}
-		if (ooi.num_points >=3)
+		if (prevState == TOWING)
+		{
+			if (dist_left > 0.0 && dist_right > 0.0)
+			{
+				if (dist_left < 0.2 || dist_right < 0.2)
+					car.stop();
+				else {
+					if (dist_left > dist_right + 0.05 && car.getSteerDegree() > -15)
+						car.steerToAbsDegree(-20);
+					else if (dist_right > dist_left + 0.05 && car.getSteerDegree() < 15)
+						car.steerToAbsDegree(20);
+					else
+						car.steerStraight();
+				}
+			}
+		}
+		else if (ooi.num_points >=3)
 		{
 			auto mid_ooi_angle = (ooi.start_angle + ooi.end_angle) * 0.5;
 			auto mid_ooi_distance = (ooi.start_distance + ooi.end_distance) * 0.5;
@@ -194,25 +215,36 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 			}
 			else{
 				auto steer_deg = car.getSteerDegree();
-				if (prevState != STOP && (steer_deg > 1 || steer_deg < -1))
-				{
-					car.stop();
-					car.steerStraight();
-					newState = STOP;
-				}
-				else if (mid_ooi_distance > 0.25)
+				if (prevState != STOP && mid_ooi_distance > 0.25)
 				{
 					if (prevState != REVERSING)
 					{
-						car.setDriveSpeed(REVERSE_SPEED);
+						car.steerStraight();
 						newState = REVERSING;
+						car.setDriveSpeed(REVERSE_SPEED);
+						cout << "approaching" << endl;
+					}
+					else if (!quickLock)
+					{
+						reversionTime = std::chrono::high_resolution_clock::now();
+						if (mid_ooi_angle <= 179 && steer_deg >= -20)
+						{
+							car.steerToAbsDegree(steer_deg - 3);
+						} else if (mid_ooi_angle >= 181 && steer_deg <= 20)
+						{
+							car.steerToAbsDegree(steer_deg + 3);
+						} else {
+							car.steerStraight();
+						}
 					}
 				}
 				else
 				{
-					newState = IDLE;
+					newState = TOWING;
 					car.stop();
 					car.closeFork();
+					car.steerStraight();
+					car.setDriveSpeed(45);
 				}
 			}
 		}
