@@ -23,14 +23,23 @@ public:
 	 */
 	void start();
 
+	/*
+	 * Line checker
+	 */
+	void checkBlackLine();
+
+	bool blackLine;
+	enum carState {IDLE, CRUISE, REVERSING, STEERING, STOP, DODGING, SCAN};
+	carState newState;
+
 private:
-	enum carState {IDLE, CRUISE, REVERSING, STEERING, STOP};
-	static void processScan(std::vector<std::tuple<float, float>> scanData);
+	void processScan(std::vector<std::tuple<float, float>> scanData);
 	static bool isWithinEllipse(float distance, float angle);
 	static void convertToXY(float distance, float angle, float *x, float *y);
+	
 #define PI 3.1415926535f
-#define CRUISE_SPEED		35
-#define STEER_SPEED			35
+#define CRUISE_SPEED		100
+#define STEER_SPEED			50
 #define REVERSE_SPEED		-20
 
 	/*

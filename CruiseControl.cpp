@@ -6,6 +6,7 @@
  */
 
 #include "CruiseControl.h"
+#include <thread>
 #include <math.h>
 #include <fstream>
 using namespace std;
@@ -13,8 +14,10 @@ using namespace lidar;
 using namespace car;
 
 
-CruiseControl::CruiseControl() {
 
+CruiseControl::CruiseControl() {
+	newState = IDLE;
+	//std::thread lineThread(&CruiseControl::checkBlackLine, this);
 }
 
 /*
@@ -35,19 +38,45 @@ void CruiseControl::convertToXY(float distance, float angle, float *x, float *y)
 	*x = distance * sin(angle);
 }
 
+void CruiseControl::checkBlackLine()
+{
+	auto &car = CarControl::getInstance();
+	bool left = true;
+
+	while(true)
+	{
+		blackLine = car.getColor() == 1;  // 1 == black
+		if(blackLine)
+		{
+			newState = DODGING;
+			car.stop();
+			if(left)
+			{
+				car.steerToAbsDegree(-40, 100);
+			}
+			else
+			{
+				car.steerToAbsDegree(50, 100);
+			}
+			left = !left;
+			newState = DODGING;
+			cout << "BLACK LINE!" << endl;
+		}
+	}
+}
+
 /*
  * Process scan data and control car.
  */
 void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 {
 	static auto collisionTime = std::chrono::high_resolution_clock::now() - std::chrono::seconds(5);
-	static auto reversionTime = std::chrono::high_resolution_clock::now() - std::chrono::seconds(5);
-	static carState newState = CRUISE, prevState = IDLE;
+	static auto eventTime = std::chrono::high_resolution_clock::now() - std::chrono::seconds(5);
+	static carState prevState = IDLE;
 	auto &car = CarControl::getInstance();
-	float steerTo = 0; //Straight
-	float minDistFront = 10.0, minDistBack = 10.0;
-	float angleToMinDistFrontDeg = 0.0, angleToMinDistFront = 0.0;
-	static float x, y;
+	float minDistFront = 2.0, minDistBack = 2.0;
+	float angleToMinDistFrontDeg = 0.0; //, angleToMinDistFront = 0.0;
+	//static float x, y;
 	auto isDriveOverloaded = car.isDriveOverloaded();
 	auto now = std::chrono::high_resolution_clock::now();
 	/*static auto prev_time = now;
@@ -55,8 +84,12 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 	std::cout << "Rate: " << 1.0f / pausetime.count() << std::endl;
 	prev_time = now;*/
 	std::chrono::duration<double> elapsed = now - collisionTime;
-	elapsed = now - reversionTime;
-	bool reversionTimeLock = elapsed.count() < 3.5;
+	elapsed = now - eventTime;
+	bool cruiseTimeLock = elapsed.count() < 3.0;
+	//bool steerTimeLock = elapsed.count() < 0.1;
+	#define MAXDEG 250.0
+	#define MINDEG 230.0
+	
 #if RECORD_RAW
 	static uint32_t count = 0;
 	std::fstream fs;
@@ -64,45 +97,31 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 	fs << "NEW DATA " << count++ << endl;
 #endif
 	if (isDriveOverloaded) {
-		if (prevState == REVERSING) {
-			newState = STEERING;
-			car.steerStraight();
-			car.setDriveSpeed(STEER_SPEED);
-		} else {
-			newState = REVERSING;
-			reversionTime = std::chrono::high_resolution_clock::now();
-			auto curSteerDeg = car.getSteerDegree();
-			if (curSteerDeg > 10 || curSteerDeg < -10) {
-				car.steerToAbsDegree(curSteerDeg * -1);
-			} else {
-				car.steerHardLeft();
-			}
-			car.setDriveSpeed(REVERSE_SPEED);
-		}
-	} else if (!reversionTimeLock) {
+		car.reset();
+	} else if (!cruiseTimeLock) {
 		for (auto tuple : scanData) {
 
 			// current angle
 
 			auto angleDeg = std::get<0>(tuple);
 			auto distance = std::get<1>(tuple);
-			auto angle = angleDeg * (PI / 180.0f);
+			//auto angle = angleDeg * (PI / 180.0f);
 			//current intensity
 			//int intensity = scan.intensities[i];
-			convertToXY(distance, angle, &x, &y);
+			//convertToXY(distance, angle, &x, &y);
 
 
-			if (angleDeg < 60 || angleDeg > 300) {
+			if (angleDeg > 90.0 && angleDeg < 270.0) {
 				// Front
 #if RECORD_RAW
 				fs << "F\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
 #endif
-				if (isWithinEllipse(x, y) && distance < minDistFront) {
+				if (distance < minDistFront) {
 					minDistFront = distance;
 					angleToMinDistFrontDeg = angleDeg;
-					angleToMinDistFront = angle;
+					//angleToMinDistFront = angle;
 				}
-			} else if (angleDeg > 120 && angleDeg < 240) {
+			} /*else if () {
 				// Back
 #if RECORD_RAW
 				fs << "B\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
@@ -117,21 +136,36 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 					fs << "I\t" << x << "\t" << y << "\t:\t" << angleDeg << "\t" << distance << endl;
 				}
 #endif
-			}
+			}*/
 		}
 
-		convertToXY(minDistFront, angleToMinDistFront, &x, &y);
-		auto weight = 1.33 - (((pow(x, 2.0) / pow(ELLIPSE_RADIUS_X, 2.0)) + (pow(y, 2.0) / pow(ELLIPSE_RADIUS_Y, 2.0))));
+		//convertToXY(minDistFront, angleToMinDistFront, &x, &y);
+		//auto weight = 1.33 - (((pow(x, 2.0) / pow(ELLIPSE_RADIUS_X, 2.0)) + (pow(y, 2.0) / pow(ELLIPSE_RADIUS_Y, 2.0))));
 
 		cout << "front: " << minDistFront << "\t" << angleToMinDistFrontDeg
 				<< "\tback: " << minDistBack << endl;
 
-		if (newState != REVERSING) {
+		if (newState == IDLE || newState == STOP) {
 			/*
 			 * The closer the obstacle, the higher the weight.
 			 * Maximum is weight 1.33
 			 */
-			if (weight <= 1.18) {
+			if (minDistFront > 0.3) {
+				if (minDistFront > 1.5 || angleToMinDistFrontDeg > MAXDEG || angleToMinDistFrontDeg < MINDEG)
+				{
+					int direction = angleToMinDistFrontDeg > MAXDEG ? 10000 : -10000;
+					car.steerToAbsDegree(10000, 10);
+					eventTime = std::chrono::high_resolution_clock::now();
+					newState = SCAN;
+				}
+			}
+			else {
+				car.setDriveSpeed(-CRUISE_SPEED);
+				newState = CRUISE;
+				eventTime = std::chrono::high_resolution_clock::now();
+			}
+
+			/*if (weight <= 1.18) {
 				if (angleToMinDistFrontDeg > 180.0) {
 					steerTo = MIN_STEER_ANGLE * weight;
 					cout << "right: " << steerTo << " w: " << weight << endl;
@@ -161,8 +195,44 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 				}
 				newState = REVERSING;
 				reversionTime = std::chrono::high_resolution_clock::now();
+			}*/
+		} else if(newState == SCAN)
+		{
+			if (minDistFront <= 1.5 && angleToMinDistFrontDeg <= MAXDEG && angleToMinDistFrontDeg >= MINDEG)
+			{
+				car.stop();
+				newState = STOP;
 			}
-		} else if (newState == REVERSING) {
+			else {
+				cout << "KEEP SCANNING " << angleToMinDistFrontDeg << " angle " << angleToMinDistFrontDeg << endl;
+			}
+		}
+		else if(newState == CRUISE)
+		{
+			if (!cruiseTimeLock && !blackLine)
+			{
+				car.stop();
+				newState = STOP;
+			}
+		}
+		else if(newState == DODGING)
+		{
+			if(!car.isRunning() && !blackLine)
+			{
+				newState = CRUISE;
+				car.setDriveSpeed(CRUISE_SPEED);
+				eventTime = std::chrono::high_resolution_clock::now();
+			}
+		}
+		else if(newState == STEERING)
+		{
+			if(!car.isRunning() && !blackLine)
+			{
+				car.stop();
+				newState = STOP;
+			}
+		}
+		/*else if (newState == REVERSING) {
 			if (minDistFront > 0.33
 					&& minDistBack > 0.25) {
 				car.setDriveSpeed(CRUISE_SPEED);
@@ -172,16 +242,49 @@ void CruiseControl::processScan(std::vector<std::tuple<float, float>> scanData)
 				car.setDriveSpeed(0);
 				newState = CRUISE;
 			}
-		}
+		}*/
 	}
-
+	
 	//auto end = std::chrono::high_resolution_clock::now();
 	//std::chrono::duration<double> elapsed = end - start;
 	//cout << "CB rt: " << elapsed.count() << " state = " << newState << endl;
 #if RECORD_RAW
 	fs.close();
 #endif
-	prevState = newState;
+	if (prevState != newState)
+	{
+		cout << "State changed to ";
+		switch (newState)
+		{
+		case IDLE:
+			cout << "IDLE" << endl;
+			break;
+		
+		case CRUISE:
+			cout << "CRUISE" << endl;
+			break;
+
+		case REVERSING:
+			cout << "REVERSING" << endl;
+			break;
+
+		case STEERING:
+			cout << "STEERING" << endl;
+			break;
+
+		case STOP:
+			cout << "STOP" << endl;
+			break;
+
+		case DODGING:
+			cout << "DODGING" << endl;
+			break;
+		
+		default:
+			break;
+		}
+		prevState = newState;
+	}
 }
 
 void CruiseControl::start() {

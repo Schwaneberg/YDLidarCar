@@ -20,22 +20,6 @@ namespace car {
 class CarControl {
 public:
 	/*
-	 * Define the maximum steering angles
-	 * and targeted speed of the car.
-	 */
-	#define MAX_STEER_ANGLE 30
-	#define MIN_STEER_ANGLE	-30
-	#define STEER_MOTOR_SPEED 350
-
-	/*
-	 * HOLD = Motor holds position
-	 * MOVING = Motor steers to new position
-	 * STALLED = Motor tries to move but
-	 *           steering is mechanically blocked
-	 */
-	enum steerState{HOLD, MOVING, STALLED};
-
-	/*
 	 * @return static instance of CarControl
 	 * (Singleton)
 	 */
@@ -55,40 +39,17 @@ public:
 	bool isReady();
 
 	/*
-	 * Calibrate steering
+	 * Get the color from the color sensor.
+	    - 0: No color
+        - 1: Black
+        - 2: Blue
+        - 3: Green
+        - 4: Yellow
+        - 5: Red
+        - 6: White
+        - 7: Brown
 	 */
-	void calibSteering();
-
-	/*
-	 * Control fork position
-	 */
-	void openFork();
-
-	/*
-	 * Control fork position: grasping
-	 */
-	void closeFork();
-
-	/*
-	 * Steer to absoulte motor position
-	 * @param absolute position
-	 */
-	void steerToPos(int pos);
-
-	/*
-	 * @return current absolute position of steering motor
-	 */
-	int getSteerPos();
-
-	/*
-	 * Preset to steer left at maximum angle.
-	 */
-	void steerHardLeft();
-
-	/*
-	 * Preset to steer right at maximum angle.
-	 */
-	void steerHardRight();
+	int getColor();
 
 	/*
 	 * Preset to center steering.
@@ -99,12 +60,7 @@ public:
 	 * Set steering to angle
 	 * @param angle -30 (right) over 0 (center) to 30 (left) degree
 	 */
-	void steerToAbsDegree(int angle);
-
-	/*
-	 * @return current position of steering in degree
-	 */
-	int getSteerDegree();
+	void steerToAbsDegree(int angle, int speed);
 
 	/*
 	 * @param speed in percent.
@@ -114,6 +70,10 @@ public:
 	 */
 	void setDriveSpeed(int percent);
 
+	/*
+	 * Stop the car
+	 */
+	void stop();
 	
 	/*
 	 * @return true if drive is stalled
@@ -121,16 +81,17 @@ public:
 	bool isDriveOverloaded();
 
 	/*
-	 * @return current state of steering motor
-	 */
-	steerState getSteeringState();
+	* @return true if motors are running
+	*/
+	bool isRunning();
+
 private:
 	CarControl();
 	virtual ~CarControl();
-	ev3dev::large_motor forkMotor;
-	ev3dev::large_motor driveMotor;
-	ev3dev::medium_motor steeringMotor;
-	int steeringRange;					// Positive or negative range from neutral position
+	ev3dev::large_motor leftMotor;
+	ev3dev::large_motor rightMotor;
+	ev3dev::touch_sensor bumper;
+	ev3dev::color_sensor colorSensor;
 };
 
 } /* namespace CarControl */
